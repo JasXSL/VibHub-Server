@@ -1,0 +1,15 @@
+{
+  "name": "vibhub",
+  "version": "0.0.0",
+  "description": "A hub of vibrators!",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "JasX",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "express": "^4.16.2",
+    "socket.io": "^2.0.4"
+  }
+}
