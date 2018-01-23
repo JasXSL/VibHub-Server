@@ -1,4 +1,6 @@
-const app = require("express")(),
+const
+	express = require("express"),
+	app = express(),
 	http = require("http").Server(app),
 	io = require("socket.io")(http)
 ;
@@ -16,11 +18,14 @@ class Server{
 		http.listen(this.port, () => {
 			console.log("Server online", th.port);
 		});
+
+		app.use(express.static(__dirname+'/public'));
 	
 		// Handle http requests
-		app.get('/', (req, res) => {
+		app.get('/api', (req, res) => {
 			th.onGet(req, res);
 		});
+
 	
 		// Handle WS requests
 		io.on("connection", socket => {
