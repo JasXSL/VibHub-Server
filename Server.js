@@ -80,8 +80,8 @@ class Server{
 
 			// A data request to be forwarded TO a device
 			/*
-				Buffer should be an ArrayBuffer of 3x 8bit bytes.
-				0 = device(setup by hookup), 1 = Task, 2 = intensity between 0 and 100
+				Buffer should be an ArrayBuffer with a UInt8Array. The first value is the device index, the following values sets the duty cycle on the port between 0 and 255
+				Ex: 0 100 100 100 100 would set all 4 ports to 100% intensity
 			*/
 			socket.on("p", buffer => {
 
@@ -90,20 +90,19 @@ class Server{
 				
 
 				let view = new Int8Array(buffer);
-				let index = view[0],
-					task = view[1],
-					val = view[2]
-				;
+				let index = view[0];
 
-				if( !socket._devices[index] )
+				let device = socket._devices[index];
+				if( !device )
 					return;
 
-				// Ok we found the device, send
-				let device = socket._devices[index];
-				buffer = new ArrayBuffer(2);
-				view = new Int8Array(buffer);
-				view[0] = task;
-				view[1] = val;
+				// Ok we found the device, build it
+				buffer = new ArrayBuffer(4);
+				let v = new Int8Array(buffer);
+				v[0] = view[1] || 0;	// Begin at 1 because 
+				v[1] = view[2] || 0;
+				v[2] = view[3] || 0;
+				v[3] = view[4] || 0;
 				
 				this.sendToDevice(device, "p", buffer);
 				
