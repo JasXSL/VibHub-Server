@@ -135,7 +135,7 @@ class Server{
 		if( 
 			!id || !data || !type ||
 			typeof id !== 'string' ||
-			typeof data !== 'object' ||
+			(typeof data !== 'object' && !Array.isArray(data)) ||
 			typeof type !== 'string'			
 		){
 			out.message = 'Invalid query string. Expecting id = (str)deviceID, data = (jsonObject)data, type = (str)messageType<br />Received id['+typeof id+'], data['+typeof data+'], type['+typeof type+']';
