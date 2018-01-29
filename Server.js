@@ -94,7 +94,7 @@ class Server{
 					return;
 				
 
-				let view = new Int8Array(buffer);
+				let view = new Uint8Array(buffer);
 				let index = view[0];
 
 				let device = socket._devices[index];
@@ -102,14 +102,14 @@ class Server{
 					return;
 
 				// Ok we found the device, build it
-				buffer = new ArrayBuffer(4);
-				let v = new Uint8Array(buffer);
+				let v = new Uint8Array(4);
 				v[0] = view[1] || 0;	// Begin at 1 because 
 				v[1] = view[2] || 0;
 				v[2] = view[3] || 0;
 				v[3] = view[4] || 0;
 				
-				this.sendToDevice(device, "p", buffer);
+                let hex = Buffer.from(v).toString('hex');
+                this.sendToDevice(device, "p", hex);
 				
 			});
 
@@ -157,7 +157,7 @@ class Server{
 	sendToDevice( id, type, data ){
 
 		io.to(id).emit(type, data);
-		this.debug("Emitting ", type, "to", id);
+		this.debug("Emitting ", type, "to", id, "with data",data);
 
 	}
 
