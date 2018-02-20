@@ -53,6 +53,7 @@ class Server{
 			// Sets up a shortcut for hookup
 			socket.on("hookup", (id, res) => {
 
+				th.debug("Hookup received!");
 				if( typeof id === 'string' ){
 
 					if( !Array.isArray(socket._devices) )
@@ -81,6 +82,8 @@ class Server{
 
 
 				res(socket._devices);
+
+
 			});
 
 			// A data request to be forwarded TO a device
@@ -89,6 +92,17 @@ class Server{
 				Ex: 0 255 255 255 255 would set all 4 ports to 100% intensity on device index 0 
 			*/
 			socket.on("p", buffer => {
+
+				th.debug("Buffer received ", buffer, typeof buffer);
+
+				if( typeof buffer === "string" ){
+					
+					let buf = new Buffer(8);
+					for( let i=0; i < 5; ++i )
+						buf[i] = parseInt(buffer.substr(i*2, 2), 16);
+					buffer = buf;
+					
+				}
 
 				if( !buffer || buffer.constructor !== Buffer || !Array.isArray(socket._devices) )
 					return;
