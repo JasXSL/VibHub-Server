@@ -98,7 +98,7 @@ class Server{
 				if( typeof buffer === "string" ){
 					
 					let buf = new Buffer(8);
-					for( let i=0; i < 5; ++i )
+					for( let i=0; i < buffer.length/2; ++i )
 						buf[i] = parseInt(buffer.substr(i*2, 2), 16);
 					buffer = buf;
 					
