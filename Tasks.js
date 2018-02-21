@@ -21,6 +21,9 @@ module.exports = {
 	TASK_DEVICE_ONLINE : "dev_online",		// (str)id, (str)socketID | Automatically sent to all apps that have hooked up to a device whenever it comes online
 	TASK_DEVICE_OFFLINE : "dev_offline",	// (str)id, (str)socketID | Automatically sent to all apps that have hooked up to a device whenever it goes offline
 
-
+	TASK_CUSTOM_TO_DEVICE : "dCustom",		// (str)deviceID, (var)custom_data | Forwards custom data to an app connected to the device it's sent from by name
+											// Received by the device on success: (str)serverName, (str)socketID, (var)custom_data
+	TASK_CUSTOM_TO_APP : "aCustom",			// [TODO] (str)appName, (var)custom_data | Forwards custom data to a device connected to the app by name. For this to work, the app must be named via TASK_ADD_APP
+											// Received by the app on success: (str)deviceID, (str)socketID, (var)custom_data
 };
 

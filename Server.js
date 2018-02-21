@@ -3,47 +3,111 @@ const
 	app = express(),
 	http = require("http").Server(app),
 	io = require("socket.io")(http),
-	TASKS = require("./Tasks")
+	TASKS = require("./Tasks"),
+	fs = require('fs')
 ;
-
-/*
-	Socket tasks explained:
-
-*/
 
 class Server{
 
 	constructor( config ){
-
+	
 		let th = this;
 
-		this.allowDebug = config.debug;
-		this.port = +config.port;
+		// Server base configuration
+		this.config = {
+			port : 6969,
+			debug : false
+		};
+
+		this.loadConfig()
+		.then(() => {
+
+			// Begin
+			th.allowDebug = th.config.debug;
+			th.port = +th.config.port;
+			
+			// Start HTTP listening
+			http.listen(th.port, () => {
+				console.log("Server online", th.port);
+			});
+
+			app.use(express.static(__dirname+'/public'));
 		
-		// Start HTTP listening
-		http.listen(this.port, () => {
-			console.log("Server online", th.port);
+			// Handle http requests
+			app.get('/api', (req, res) => { th.onGet(req, res); });
+
+			// Handle WS requests
+			io.on("connection", socket => {
+
+				th.debug("sIO New generic connection established");
+
+				socket.on("disconnect", () => { th.onDisconnect(socket); });
+				socket.on(TASKS.TASK_ADD_DEVICE, id => { th.onDeviceConnected(socket, id); });
+				socket.on(TASKS.TASK_HOOKUP, (id, res) => { th.onAppHookup(socket, id, res); });
+				socket.on(TASKS.TASK_HOOKDOWN, (id, res) => { th.onAppHookdown(socket, id, res); });
+				socket.on(TASKS.TASK_PWM, buffer => { th.onSocketPWM(socket, buffer); });
+				socket.on(TASKS.TASK_ADD_APP, (name) => { th.onAppName(socket, name); });
+				socket.on(TASKS.TASK_CUSTOM_TO_DEVICE, (data) => { th.onCustomToDevice(socket, data); });
+				socket.on(TASKS.TASK_CUSTOM_TO_APP, (data) => { th.onCustomToApp(socket, data); });
+
+			});
+
+
+		})
+		.catch(err => {
+			console.error("Unable to load config, using default. Error: ", err);
 		});
 
-		app.use(express.static(__dirname+'/public'));
+
+	}
+
+
+	loadConfig(){
+
+		let th = this;
+		// Get config
+		return new Promise( (res, rej) => {
+
+			fs.readFile(__dirname+'/config.json', 'utf8', (err, data) => {
+				
+				if( err )
+					return rej("Unable to read config, using defaults: "+err.code);
+					
+				try{
 	
-		// Handle http requests
-		app.get('/api', (req, res) => { th.onGet(req, res); });
-
-		// Handle WS requests
-		io.on("connection", socket => {
-
-			th.debug("sIO New generic connection established");
-
-			socket.on("disconnect", () => { th.onDisconnect(socket); });
-			socket.on(TASKS.TASK_ADD_DEVICE, id => { th.onDeviceConnected(socket, id); });
-			socket.on(TASKS.TASK_HOOKUP, (id, res) => { th.onAppHookup(socket, id, res); });
-			socket.on(TASKS.TASK_HOOKDOWN, (id, res) => { th.onAppHookdown(socket, id, res); });
-			socket.on(TASKS.TASK_PWM, buffer => { th.onSocketPWM(socket, buffer); });
-			socket.on(TASKS.TASK_ADD_APP, (name) => { th.onAppName(socket, name); });
+					let json = JSON.parse(data);
+					if( typeof json !== "object" )
+						return rej('Config is not an object');
+	
+					else{
+	
+						for( let i in json ){
+	
+							if( th.config.hasOwnProperty(i) ){
+	
+								if( typeof th.config[i] === typeof json[i] )
+									th.config[i] = json[i];
+								else
+									console.log("Invalid type of config", i, "got", typeof json[i], "expected", typeof th.config[i]);
+	
+							}
+							else
+								console.log("Unknown config property", i);
+	
+						}
+	
+					}
+	
+				}catch(e){
+					rej(e);
+				}
+				
+				res();
+	
+			});
 
 		});
-
+		
 	}
 
 
@@ -170,8 +234,12 @@ class Server{
 			return;
 
 		name = name.substr(0, 128);
+		if( socket._app_name )
+			socket.leave(Server.appSelfRoom(socket._app_name));
 		socket._app_name = name;
-		
+		if( name )
+			socket.join(Server.appSelfRoom(name));
+
 		// Tell any connected devices that we changed name
 		this.sendToDevicesByAppSocket(socket, TASKS.TASK_ADD_APP, [
 			socket._app_name || '',
@@ -272,7 +340,50 @@ class Server{
 
 	}
 
+	// Custom data to a device by id
+	onCustomToDevice( socket, data ){
+
+		if( !Array.isArray(data) || !Array.isArray(socket._devices) )
+			return;
+		
+		// This app is not connected to the device
+		let id = data.shift();
+		if( !id || socket._devices.indexOf(id) === -1 )
+			return;
+		
+		// Ok now we can send it
+		this.sendToRoom(Server.deviceSelfRoom(id), TASKS.TASK_CUSTOM_TO_DEVICE, [
+			data.shift(), 
+			socket._app_name || '', 
+			socket.id
+		]);
+
+	}
+
+	// Sends custom data to app if the device this is sent from is connected to it
+	onCustomToApp( socket, data ){
+
+		// Data malformed or socket is not a device
+		if( !Array.isArray(data) || !socket._device_id )
+			return;
+
+		let name = data.shift();
+		if( typeof name !== "string" )
+			return;
+
+		if( !Server.isSocketConnectedToApp(socket, name) )
+			return;
+
+		this.sendToRoom(Server.appSelfRoom(name), TASKS.TASK_CUSTOM_TO_APP, [
+			socket._device_id,
+			socket.id,
+			data.shift()
+		]);
+		
+	}
 	
+
+
 
 	// Send message to device
 	sendToRoom( id, type, data ){
@@ -333,6 +444,42 @@ class Server{
 	// Converts an ID to an app target room. This room is joined by apps connecting to device id
 	static deviceAppRoom( id ){
 		return id+"_a"; 
+	}
+
+	// Converts an app name to a room for that app
+	static appSelfRoom( name ){
+		return name+"_as";
+	}
+
+	// Checks if a device socket is connected to an app by name
+	static isSocketConnectedToApp( socket, appName ){
+
+		let devid = socket._device_id;
+		if( !devid )
+			return;
+
+		let ns = io.of("/");
+		// make sure this socket is actually connected to that app
+		let found = false;
+		io.in(Server.appSelfRoom(appName)).clients((err, clients) => {
+
+			if( err )
+				return;
+
+			for( let s of clients ){
+				
+				let socket = ns.connected[s];
+				if( socket && Array.isArray(socket._devices) && ~socket._devices.indexOf(devid) ){
+					found = true;
+					break;
+				}
+
+			}
+
+		});
+
+		return found;
+
 	}
 
 }
