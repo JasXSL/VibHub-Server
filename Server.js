@@ -46,7 +46,7 @@ class Server{
 				socket.on(TASKS.TASK_HOOKUP, (id, res) => { th.onAppHookup(socket, id, res); });
 				socket.on(TASKS.TASK_HOOKDOWN, (id, res) => { th.onAppHookdown(socket, id, res); });
 				socket.on(TASKS.TASK_PWM, buffer => { th.onSocketPWM(socket, buffer); });
-				socket.on(TASKS.TASK_ADD_APP, (name) => { th.onAppName(socket, name); });
+				socket.on(TASKS.TASK_ADD_APP, (name, res) => { th.onAppName(socket, name, res); });
 				socket.on(TASKS.TASK_CUSTOM_TO_DEVICE, (data) => { th.onCustomToDevice(socket, data); });
 				socket.on(TASKS.TASK_CUSTOM_TO_APP, (data) => { th.onCustomToApp(socket, data); });
 
@@ -144,9 +144,18 @@ class Server{
 
 		// Tell any apps subscribed to this id that a device has come online
 		this.sendToAppsByDeviceSocket(socket, TASKS.TASK_DEVICE_ONLINE, [id, socket.id]);
-
 		this.debug("device", id, "is now listening");
 
+		Server.getAppsControllingDevice(socket)
+		.catch(err => {console.error("Unable to get apps controlling device", err);})
+		.then(apps => {
+
+			console.log("Apps in my room: ", apps.length);
+			for( let app of apps )
+				this.sendToSocket(socket, TASKS.TASK_ADD_APP, [app._app_name || '', app.id]);
+
+		});
+		
 	}
 
 	// Adds one or more devices from an app connection
@@ -228,14 +237,18 @@ class Server{
 
 	}
 
-	onAppName( socket, name ){
+	onAppName( socket, name, res ){
 
 		if( typeof name !== "string" )
 			return;
 
 		name = name.substr(0, 128);
+
+		// Leave old room
 		if( socket._app_name )
 			socket.leave(Server.appSelfRoom(socket._app_name));
+
+		// Join new room
 		socket._app_name = name;
 		if( name )
 			socket.join(Server.appSelfRoom(name));
@@ -245,6 +258,8 @@ class Server{
 			socket._app_name || '',
 			socket.id
 		]);
+
+		res(true);
 
 	}
 
@@ -371,14 +386,22 @@ class Server{
 		if( typeof name !== "string" )
 			return;
 
-		if( !Server.isSocketConnectedToApp(socket, name) )
-			return;
+		Server.isSocketConnectedToApp(socket, name)
+		.catch(err => {console.error(err);})
+		.then(yes => {
 
-		this.sendToRoom(Server.appSelfRoom(name), TASKS.TASK_CUSTOM_TO_APP, [
-			socket._device_id,
-			socket.id,
-			data.shift()
-		]);
+			if( !yes )
+				return;
+
+			this.sendToRoom(Server.appSelfRoom(name), TASKS.TASK_CUSTOM_TO_APP, [
+				socket._device_id,
+				socket.id,
+				data.shift()
+			]);
+
+		});
+
+		
 		
 	}
 	
@@ -451,7 +474,43 @@ class Server{
 		return name+"_as";
 	}
 
+	// Returns a promise resolving to sockets currently controlling a device id
+	static getAppsControllingDevice( socket ){
+
+		let devid = socket._device_id;
+
+		if( !devid )
+			return [];
+
+		let out = [];
+		let ns = io.of("/");
+		// make sure this socket is actually connected to that app
+		return new Promise((res, rej) => {
+
+			io.in(Server.deviceAppRoom(devid)).clients((err, clients) => {
+
+				if( err )
+					return rej(err);
+
+				for( let s of clients ){
+					
+					let socket = ns.connected[s];
+					if( socket )
+						out.push(socket);
+
+				}
+
+				res(out);
+
+			});
+
+		});
+
+	}
+
+
 	// Checks if a device socket is connected to an app by name
+	// returns a promise which resolves to true or false
 	static isSocketConnectedToApp( socket, appName ){
 
 		let devid = socket._device_id;
@@ -460,25 +519,22 @@ class Server{
 
 		let ns = io.of("/");
 		// make sure this socket is actually connected to that app
-		let found = false;
-		io.in(Server.appSelfRoom(appName)).clients((err, clients) => {
+		
+		return new Promise((res, rej) => {
 
-			if( err )
-				return;
+			io.in(Server.appSelfRoom(appName)).clients((err, clients) => {
 
-			for( let s of clients ){
-				
-				let socket = ns.connected[s];
-				if( socket && Array.isArray(socket._devices) && ~socket._devices.indexOf(devid) ){
-					found = true;
-					break;
-				}
+				if( err )
+					return rej(err);
 
-			}
+				if( clients.length )
+					return res(true);
+
+				res(false);
+
+			});
 
 		});
-
-		return found;
 
 	}
 
