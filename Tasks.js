@@ -26,5 +26,7 @@ module.exports = {
 											// Received by the device on success: (str)serverName, (str)socketID, (var)custom_data
 	TASK_CUSTOM_TO_APP : "aCustom",			// (str)appName, (var)custom_data | Forwards custom data to a device connected to the app by name. For this to work, the app must be named via TASK_ADD_APP
 											// Received by the app on success: (str)deviceID, (str)socketID, (var)custom_data
+	TASK_GET : "GET",						// {id:(str)deviceID, type:(str)type, data:(obj)data} | Same syntax as REST requests, except via websockets
+						
 };
 

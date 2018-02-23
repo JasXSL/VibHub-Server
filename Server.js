@@ -49,6 +49,21 @@ class Server{
 				socket.on(TASKS.TASK_ADD_APP, (name, res) => { th.onAppName(socket, name, res); });
 				socket.on(TASKS.TASK_CUSTOM_TO_DEVICE, (data) => { th.onCustomToDevice(socket, data); });
 				socket.on(TASKS.TASK_CUSTOM_TO_APP, (data) => { th.onCustomToApp(socket, data); });
+				socket.on(TASKS.TASK_GET, (data) => { 
+					
+					th.debug("Program received", data, typeof data);
+					if( typeof data !== "object" )
+						return th.debug("Program is not acceptable");
+
+						th.handleGet(data.id, data.data, data.type)
+					.then(() => {
+						th.debug("Program successfully accepted");
+					})
+					.catch(err => {
+						th.debug("Program error", err);
+					}); 
+
+				});
 
 			});
 
@@ -133,7 +148,7 @@ class Server{
 	// Enables a device for listening
 	onDeviceConnected( socket, id ){
 
-		if( typeof id !== 'string' )
+		if( typeof id !== 'string' || !id )
 			return this.debug("Invalid ID for room join");
 
 		id = id.substr(0,128);
@@ -265,50 +280,69 @@ class Server{
 
 
 	// DATA
-	// Buffer to send to all 4
-	onSocketPWM( socket, buffer ){
+	// Forwards a hex string to the device
+	onSocketPWM( socket, hex ){
 
-		/*
-			Buffer should be an ArrayBuffer with a UInt8Array or a hex string that can be converted to one. 
-			Hex can be especially useful if you're limited to 32 bits.
-			The first value is the device index, the following values sets the duty cycle on the port between 0 and 255
-			Ex: 0 255 255 255 255 would set all 4 ports to 100% intensity on device index 0 
-		*/
-		this.debug("Buffer received ", buffer, typeof buffer);
+		this.debug("Hex received ", hex);
 
-		if( typeof buffer === "string" ){
+		if( 
+			typeof hex !== "string" || 				// Hex is not a string
+			hex.length < 4 || 						// Hex needs to contain at least 2 bytes
+			hex.length%2 ||							// Hex is not a multiple of 2
+			!hex.match(/-?[0-9a-fA-F]+/) ||		// Hex is not hexadecimal
+			!Array.isArray(socket._devices)			// The socket is not an app
+		)return;
 			
-			let buf = new Buffer(8);
-			for( let i=0; i < buffer.length/2; ++i )
-				buf[i] = parseInt(buffer.substr(i*2, 2), 16);
-			buffer = buf;
-			
-		}
-
-		if( !buffer || buffer.constructor !== Buffer || !Array.isArray(socket._devices) )
-			return;
-		
-
-		let view = new Uint8Array(buffer);
-		let index = view[0];
-
+		let index = parseInt(hex.substr(0, 2), 16);
 		let device = socket._devices[index];
 		if( !device )
 			return;
 
-		// Ok we found the device, build it
-		let v = new Uint8Array(4);
-		v[0] = view[1] || 0;	// Begin at 1 because 
-		v[1] = view[2] || 0;
-		v[2] = view[3] || 0;
-		v[3] = view[4] || 0;
-		
-		let hex = Buffer.from(v).toString('hex');
 		this.sendToRoom(
 			Server.deviceSelfRoom(device), 
 			TASKS.TASK_PWM,
-			hex
+			hex.substr(2).toLowerCase()
 		);
+
+	}
+
+	// Program request via socket, works the same as GET
+	onSocketProgram( socket, program ){
+
+		if( typeof program !== 'object' && !Array.isArray(program) )
+			return;
+
+		this.sendToRoom(Server.deviceSelfRoom(), type, data);
+
+	}
+
+	handleGet( id, data, type ){
+
+		let th = this;
+		return new Promise((res, rej) => {
+
+			let allowed_types = [
+				"vib"
+			];
+
+			if( 
+				!id || !data || !type ||
+				typeof id !== 'string' ||
+				(typeof data !== 'object' && !Array.isArray(data)) ||
+				typeof type !== 'string'			
+			)rej('Invalid query string. Expecting id = (str)deviceID, data = (jsonObject)data, type = (str)messageType<br />Received id['+typeof id+'], data['+typeof data+'], type['+typeof type+']');
+			
+			else if( allowed_types.indexOf(type) === -1 )
+				rej('Invalid type specified. Supported types are:<ul><li>'+allowed_types.join('</li><li>')+'</li></ul>');
+
+			else{
+
+				th.sendToRoom(Server.deviceSelfRoom(id), type, data);
+				res();
+	
+			}
+
+		});
 
 	}
 
@@ -320,38 +354,25 @@ class Server{
 			message : 'OK',
 		};
 
-		let id = req.query.id,
-			data = req.query.data,
-			type = req.query.type,
-			allowed_types = [
-				"vib"
-			]
-		;
-
+		let data = req.query.data;
 		try{
 			data = JSON.parse(data);
 		}catch(e){
-			//console.error(e);
+			//this.debug(e);
+			return;
 		}
 
-		if( 
-			!id || !data || !type ||
-			typeof id !== 'string' ||
-			(typeof data !== 'object' && !Array.isArray(data)) ||
-			typeof type !== 'string'			
-		){
-			out.message = 'Invalid query string. Expecting id = (str)deviceID, data = (jsonObject)data, type = (str)messageType<br />Received id['+typeof id+'], data['+typeof data+'], type['+typeof type+']';
-		}
-		else if( allowed_types.indexOf(type) === -1 )
-			out.message = 'Invalid type specified. Supported types are:<ul><li>'+allowed_types.join('</li><li>')+'</li></ul>';
-		else{
-			
-			status = 200;
-			this.sendToRoom(Server.deviceSelfRoom(id), type, data);
-
-		}
-		res.status(out.status);
-		res.send(out.message);
+		this.handleGet(req.query.id, data, req.query.type)
+		.then(() => {
+			out.status = 200;
+		})
+		.catch(err => {
+			out.message = err;
+		})
+		.then(() => {
+			res.status(out.status);
+			res.send(out.message);
+		});
 
 	}
 
