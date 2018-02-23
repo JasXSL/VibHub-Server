@@ -45,7 +45,7 @@ class Server{
 				socket.on(TASKS.TASK_ADD_DEVICE, id => { th.onDeviceConnected(socket, id); });
 				socket.on(TASKS.TASK_HOOKUP, (id, res) => { th.onAppHookup(socket, id, res); });
 				socket.on(TASKS.TASK_HOOKDOWN, (id, res) => { th.onAppHookdown(socket, id, res); });
-				socket.on(TASKS.TASK_PWM, buffer => { th.onSocketPWM(socket, buffer); });
+				socket.on(TASKS.TASK_PWM, hex => { th.onSocketPWM(socket, hex); });
 				socket.on(TASKS.TASK_ADD_APP, (name, res) => { th.onAppName(socket, name, res); });
 				socket.on(TASKS.TASK_CUSTOM_TO_DEVICE, (data) => { th.onCustomToDevice(socket, data); });
 				socket.on(TASKS.TASK_CUSTOM_TO_APP, (data) => { th.onCustomToApp(socket, data); });
@@ -64,6 +64,7 @@ class Server{
 					}); 
 
 				});
+				socket.on(TASKS.TASK_PWM_SPECIFIC, hex => { th.onSocketPWM(socket, hex, TASKS.TASK_PWM_SPECIFIC); });
 
 			});
 
@@ -281,9 +282,10 @@ class Server{
 
 	// DATA
 	// Forwards a hex string to the device
-	onSocketPWM( socket, hex ){
+	onSocketPWM( socket, hex, task ){
 
 		this.debug("Hex received ", hex);
+		task = task || TASKS.TASK_PWM;
 
 		if( 
 			typeof hex !== "string" || 				// Hex is not a string
@@ -300,7 +302,7 @@ class Server{
 
 		this.sendToRoom(
 			Server.deviceSelfRoom(device), 
-			TASKS.TASK_PWM,
+			task,
 			hex.substr(2).toLowerCase()
 		);
 

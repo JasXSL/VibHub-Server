@@ -3,8 +3,9 @@
 module.exports = {
 
 	TASK_PWM : "p",							// (string)hex_pwm_bytes | Forward a hexadecimal PWM value update to one or more devices
-											// When sent to the server, the first byte is the device to send to, can you can also send an 8-bit arraybuffer instead of hex.
-	
+											// When sent to the server, the first byte is the device to send to
+	TASK_PWM_SPECIFIC : "ps",				// (string)hex_pwm_bytes | Similar to above, but ports are specified, hex bytes are in the order of: deviceIndex, port_id,pwm, port_id2,pwm2...
+
 	TASK_VIB : "vib",						// Automatically sent by the server to a device when a REST program is received.
 	
 	TASK_ADD_DEVICE : "id",					// (str)id | Adds a device to the server, allowing apps to send data to it. id is limited to 128 bytes
