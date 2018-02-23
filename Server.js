@@ -259,16 +259,7 @@ class Server{
 			return;
 
 		name = name.substr(0, 128);
-
-		// Leave old room
-		if( socket._app_name )
-			socket.leave(Server.appSelfRoom(socket._app_name));
-
-		// Join new room
 		socket._app_name = name;
-		if( name )
-			socket.join(Server.appSelfRoom(name));
-
 		// Tell any connected devices that we changed name
 		this.sendToDevicesByAppSocket(socket, TASKS.TASK_ADD_APP, [
 			socket._app_name || '',
@@ -405,25 +396,26 @@ class Server{
 		if( !Array.isArray(data) || !socket._device_id )
 			return;
 
-		let name = data.shift();
-		if( typeof name !== "string" )
+		let id = data.shift(),
+			output = data.shift()
+		;
+		if( typeof id !== "string" )
 			return;
 
-		Server.isSocketConnectedToApp(socket, name)
-		.catch(err => {console.error(err);})
-		.then(yes => {
+		let app = io.sockets.sockets[id];
+		if( !app )
+			return;
 
-			if( !yes )
-				return;
-
-			this.sendToRoom(Server.appSelfRoom(name), TASKS.TASK_CUSTOM_TO_APP, [
-				socket._device_id,
-				socket.id,
-				data.shift()
-			]);
-
-		});
-
+		// This device is not connected to the app
+		if( !Array.isArray(app._devices) || app._devices.indexOf(socket._device_id) === -1 )
+			return;
+		
+		// All clear
+		this.sendToSocket(app, TASKS.TASK_CUSTOM_TO_APP, [
+			socket._device_id,
+			socket.id,
+			output
+		]);
 		
 		
 	}
@@ -532,34 +524,6 @@ class Server{
 	}
 
 
-	// Checks if a device socket is connected to an app by name
-	// returns a promise which resolves to true or false
-	static isSocketConnectedToApp( socket, appName ){
-
-		let devid = socket._device_id;
-		if( !devid )
-			return;
-
-		let ns = io.of("/");
-		// make sure this socket is actually connected to that app
-		
-		return new Promise((res, rej) => {
-
-			io.in(Server.appSelfRoom(appName)).clients((err, clients) => {
-
-				if( err )
-					return rej(err);
-
-				if( clients.length )
-					return res(true);
-
-				res(false);
-
-			});
-
-		});
-
-	}
 
 }
 
