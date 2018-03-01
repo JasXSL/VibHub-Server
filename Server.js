@@ -311,6 +311,13 @@ class Server{
 
 	handleGet( id, data, type ){
 
+		try{
+			data = JSON.parse(data);
+		}catch(e){
+			//this.debug(e);
+			return Promise.reject("Invalid JSON");
+		}
+
 		let th = this;
 		return new Promise((res, rej) => {
 
@@ -348,12 +355,6 @@ class Server{
 		};
 
 		let data = req.query.data;
-		try{
-			data = JSON.parse(data);
-		}catch(e){
-			//this.debug(e);
-			return;
-		}
 
 		this.handleGet(req.query.id, data, req.query.type)
 		.then(() => {
