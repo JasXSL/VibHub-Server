@@ -9,7 +9,8 @@ Install:
 
 1. Git clone the project into any folder you want.
 2. `npm init`
-3. Edit the config.json file if you want
-4. `node index`
+3. `npm install`
+4. Edit the config.json file if you want
+5. `node index`
 
 More documentation will come later.
