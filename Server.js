@@ -3,6 +3,7 @@ const
 	app = express(),
 	http = require("http").Server(app),
 	io = require("socket.io")(http),
+	cors = require("cors"),
 	TASKS = require("./Tasks"),
 	fs = require('fs')
 ;
@@ -32,6 +33,7 @@ class Server{
 			});
 
 			app.use(express.static(__dirname+'/public'));
+			app.use(cors());
 		
 			// Handle http requests
 			app.get('/api', (req, res) => { th.onGet(req, res); });
