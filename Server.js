@@ -53,9 +53,9 @@ class Server{
 				socket.on(TASKS.TASK_CUSTOM_TO_APP, (data) => { th.onCustomToApp(socket, data); });
 				socket.on(TASKS.TASK_GET, (data) => { 
 					
-					th.debug("Program received", data, typeof data);
+					th.debug("Program received", JSON.stringify(data), typeof data);
 					if( typeof data !== "object" )
-						return th.debug("Program is not acceptable");
+						return th.debug("Program is not acceptable, expected object, got ", typeof data);
 
 						th.handleGet(data.id, data.data, data.type)
 					.then(() => {
@@ -226,11 +226,16 @@ class Server{
 	// Removes a device from an app connection
 	onAppHookdown( socket, ids, res ){
 
-		if( !Array.isArray(ids) )
-			ids = [ids];
-
 		if( !Array.isArray(socket._devices) )
 			socket._devices = [];
+
+		// Delete all
+		if( Array.isArray(ids) && !ids.length )
+			ids = socket._devices;
+
+		if( !Array.isArray(ids) )
+			ids = [ids]; 
+
 
 		for( let id of ids ){
 
@@ -313,11 +318,15 @@ class Server{
 
 	handleGet( id, data, type ){
 
-		try{
-			data = JSON.parse(data);
-		}catch(e){
-			//this.debug(e);
-			return Promise.reject("Invalid JSON");
+		if( typeof data !== "object" && !Array.isArray(data) ){
+
+			try{
+				data = JSON.parse(data);
+			}catch(e){
+				//this.debug(e);
+				return Promise.reject("Invalid JSON: "+e.message+" in "+data);
+			}
+
 		}
 
 		let th = this;
