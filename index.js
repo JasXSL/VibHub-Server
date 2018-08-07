@@ -1,5 +1,7 @@
 const Server = require('./Server');
-let server = new Server();
+const server = new Server();
+server.begin();
+
 
 
 	

@@ -11,8 +11,6 @@ const
 class Server{
 
 	constructor(){
-	
-		let th = this;
 
 		// Server base configuration
 		this.config = {
@@ -20,69 +18,68 @@ class Server{
 			debug : false
 		};
 
-		this.loadConfig()
-		.then(() => {
+	}
 
-			// Begin
-			th.allowDebug = th.config.debug;
-			th.port = +th.config.port;
-			
-			// Start HTTP listening
-			http.listen(th.port, () => {
-				console.log("Server online", th.port);
-			});
+	async begin(){
 
-			app.use(express.static(__dirname+'/public'));
-			app.use(cors());
-		
-			// Handle http requests
-			app.get('/api', (req, res) => { th.onGet(req, res); });
-
-			// Handle WS requests
-			io.on("connection", socket => {
-
-				th.debug("sIO New generic connection established");
-
-				socket.on("disconnect", () => { th.onDisconnect(socket); });
-				socket.on(TASKS.TASK_ADD_DEVICE, id => { th.onDeviceConnected(socket, id); });
-				socket.on(TASKS.TASK_HOOKUP, (id, res) => { th.onAppHookup(socket, id, res); });
-				socket.on(TASKS.TASK_HOOKDOWN, (id, res) => { th.onAppHookdown(socket, id, res); });
-				socket.on(TASKS.TASK_PWM, hex => { th.onSocketPWM(socket, hex); });
-				socket.on(TASKS.TASK_ADD_APP, (name, res) => { th.onAppName(socket, name, res); });
-				socket.on(TASKS.TASK_CUSTOM_TO_DEVICE, (data) => { th.onCustomToDevice(socket, data); });
-				socket.on(TASKS.TASK_CUSTOM_TO_APP, (data) => { th.onCustomToApp(socket, data); });
-				socket.on(TASKS.TASK_GET, (data) => { 
-					
-					th.debug("Program received", JSON.stringify(data), typeof data);
-					if( typeof data !== "object" )
-						return th.debug("Program is not acceptable, expected object, got ", typeof data);
-
-						th.handleGet(data.id, data.data, data.type)
-					.then(() => {
-						th.debug("Program successfully accepted");
-					})
-					.catch(err => {
-						th.debug("Program error", err);
-					}); 
-
-				});
-				socket.on(TASKS.TASK_PWM_SPECIFIC, hex => { th.onSocketPWM(socket, hex, TASKS.TASK_PWM_SPECIFIC); });
-
-			});
-
-
-		})
-		.catch(err => {
+		try{
+			await this.loadConfig();
+		}catch(err){
 			console.error("Unable to load config, using default. Error: ", err);
+		}
+		// Begin
+		this.allowDebug = this.config.debug;
+		this.port = +this.config.port;
+			
+		// Start HTTP listening
+		http.listen(this.port, () => {
+			console.log("Server online", this.port);
 		});
 
+		app.use(express.static(__dirname+'/public'));
+		app.use(cors());
+		
+		// Handle http requests
+		app.get('/api', (req, res) => { 
+			this.onGet(req, res); 
+		});
+
+		// Handle WS requests
+		io.on("connection", socket => {
+
+			this.debug("sIO New generic connection established");
+
+			socket.on("disconnect", () => { this.onDisconnect(socket); });
+			socket.on(TASKS.TASK_ADD_DEVICE, id => { this.onDeviceConnected(socket, id); });
+			socket.on(TASKS.TASK_HOOKUP, (id, res) => { this.onAppHookup(socket, id, res); });
+			socket.on(TASKS.TASK_HOOKDOWN, (id, res) => { this.onAppHookdown(socket, id, res); });
+			socket.on(TASKS.TASK_PWM, hex => { this.onSocketPWM(socket, hex); });
+			socket.on(TASKS.TASK_ADD_APP, (name, res) => { this.onAppName(socket, name, res); });
+			socket.on(TASKS.TASK_CUSTOM_TO_DEVICE, data => { this.onCustomToDevice(socket, data); });
+			socket.on(TASKS.TASK_CUSTOM_TO_APP, data => { this.onCustomToApp(socket, data); });
+			socket.on(TASKS.TASK_GET, async data => { 
+					
+					this.debug("Program received", JSON.stringify(data), typeof data);
+					if( typeof data !== "object" )
+						return this.debug("Program is not acceptable, expected object, got ", typeof data);
+
+					try{
+						await this.handleGet(data.id, data.data, data.type);
+						this.debug("Program successfully accepted");
+					}catch( err ){
+						this.debug("Program error", err);
+					}
+
+				});
+				socket.on(TASKS.TASK_PWM_SPECIFIC, hex => { this.onSocketPWM(socket, hex, TASKS.TASK_PWM_SPECIFIC); });
+
+		});
 
 	}
 
 
 	loadConfig(){
 
-		let th = this;
 		// Get config
 		return new Promise( (res, rej) => {
 
@@ -101,12 +98,12 @@ class Server{
 	
 						for( let i in json ){
 	
-							if( th.config.hasOwnProperty(i) ){
+							if( this.config.hasOwnProperty(i) ){
 	
-								if( typeof th.config[i] === typeof json[i] )
-									th.config[i] = json[i];
+								if( typeof this.config[i] === typeof json[i] )
+									this.config[i] = json[i];
 								else
-									console.log("Invalid type of config", i, "got", typeof json[i], "expected", typeof th.config[i]);
+									console.log("Invalid type of config", i, "got", typeof json[i], "expected", typeof this.config[i]);
 	
 							}
 							else
@@ -161,10 +158,10 @@ class Server{
 	}
 
 	// Enables a device for listening
-	onDeviceConnected( socket, id ){
+	async onDeviceConnected( socket, id ){
 
 		try{
-			id = this.testDeviceID(id);
+			id = this.formatDeviceID(id);
 		}catch(err){
 			return this.debug(err);
 		}
@@ -177,14 +174,14 @@ class Server{
 		this.sendToAppsByDeviceSocket(socket, TASKS.TASK_DEVICE_ONLINE, [id, socket.id]);
 		this.debug("device", id, "is now listening");
 
-		Server.getAppsControllingDevice(socket)
-		.catch(err => {console.error("Unable to get apps controlling device", err);})
-		.then(apps => {
-
+		try{
+			let apps = await Server.getAppsControllingDevice(socket);
 			for( let app of apps )
 				this.sendToSocket(socket, TASKS.TASK_ADD_APP, [app._app_name || '', app.id]);
-
-		});
+		}
+		catch(err){
+			console.error("Unable to get apps controlling device", err);
+		}
 		
 	}
 
@@ -200,7 +197,7 @@ class Server{
 		for( let id of ids ){
 
 			try{
-				id = this.testDeviceID(id);
+				id = this.formatDeviceID(id);
 			}catch(err){
 				continue;
 			}
@@ -255,7 +252,7 @@ class Server{
 		for( let id of ids ){
 
 			try{
-				id = this.testDeviceID(id);
+				id = this.formatDeviceID(id);
 			}catch(err){
 				continue;
 			}
@@ -348,33 +345,23 @@ class Server{
 
 		}
 
-		let th = this;
-		return new Promise((res, rej) => {
+		let allowed_types = [
+			"vib"
+		];
 
-			let allowed_types = [
-				"vib"
-			];
+		id = this.formatDeviceID(id);
 
-			id = this.testDeviceID(id);
+		if( 
+			!data || !type ||
+			(typeof data !== 'object' && !Array.isArray(data)) ||
+			typeof type !== 'string'			
+		)throw 'Invalid query string. Expecting id = (str)deviceID, data = (jsonObject)data, type = (str)messageType<br />Received id['+typeof id+'], data['+typeof data+'], type['+typeof type+']';
+		
+		if( allowed_types.indexOf(type) === -1 )
+			throw 'Invalid type specified. Supported types are:<ul><li>'+allowed_types.join('</li><li>')+'</li></ul>';
 
-			if( 
-				!data || !type ||
-				(typeof data !== 'object' && !Array.isArray(data)) ||
-				typeof type !== 'string'			
-			)rej('Invalid query string. Expecting id = (str)deviceID, data = (jsonObject)data, type = (str)messageType<br />Received id['+typeof id+'], data['+typeof data+'], type['+typeof type+']');
-			
-			else if( allowed_types.indexOf(type) === -1 )
-				rej('Invalid type specified. Supported types are:<ul><li>'+allowed_types.join('</li><li>')+'</li></ul>');
-
-			else{
-
-				id = id.toUpperCase();
-				th.sendToRoom(Server.deviceSelfRoom(id), type, data);
-				res();
-	
-			}
-
-		});
+		id = id.toUpperCase();
+		this.sendToRoom(Server.deviceSelfRoom(id), type, data);
 
 	}
 
@@ -388,17 +375,16 @@ class Server{
 
 		let data = req.query.data;
 
-		this.handleGet(req.query.id, data, req.query.type)
-		.then(() => {
+		try{
+			this.handleGet(req.query.id, data, req.query.type);
 			out.status = 200;
-		})
-		.catch(err => {
+		}
+		catch(err){
 			out.message = err;
-		})
-		.then(() => {
-			res.status(out.status);
-			res.send(out.message);
-		});
+		}
+
+		res.status(out.status);
+		res.send(out.message);
 
 	}
 
@@ -411,11 +397,11 @@ class Server{
 		// This app is not connected to the device
 		let id = data.shift();
 		try{
-			id = this.testDeviceID(id);
+			id = this.formatDeviceID(id);
 		}catch(err){
 			return this.debug(err);
 		}
-		
+
 		if( socket._devices.indexOf(id) === -1 )
 			return;
 
