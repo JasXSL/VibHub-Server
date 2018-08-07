@@ -10,13 +10,13 @@ const
 
 class Server{
 
-	constructor( config ){
+	constructor(){
 	
 		let th = this;
 
 		// Server base configuration
 		this.config = {
-			port : 6969,
+			port : 80,
 			debug : false
 		};
 
@@ -128,6 +128,18 @@ class Server{
 		
 	}
 
+	// makes sure device id is valid, throws a catchable exception if not, otherwise returns the ID
+	formatDeviceID( id ){
+
+		if( typeof id !== "string" )
+			throw "Invalide device ID type";
+
+		if( id.length < 10 || id.length > 64 )
+			throw "Invalid device ID size";
+
+		return id.toUpperCase();
+
+	}
 
 	// CONNECTIONS
 	onDisconnect( socket ){
@@ -151,10 +163,11 @@ class Server{
 	// Enables a device for listening
 	onDeviceConnected( socket, id ){
 
-		if( typeof id !== 'string' || !id )
-			return this.debug("Invalid ID for room join");
-
-		id = id.substr(0,128);
+		try{
+			id = this.testDeviceID(id);
+		}catch(err){
+			return this.debug(err);
+		}
 
 		socket.leaveAll();
 		socket.join(Server.deviceSelfRoom(id));
@@ -168,7 +181,6 @@ class Server{
 		.catch(err => {console.error("Unable to get apps controlling device", err);})
 		.then(apps => {
 
-			console.log("Apps in my room: ", apps.length);
 			for( let app of apps )
 				this.sendToSocket(socket, TASKS.TASK_ADD_APP, [app._app_name || '', app.id]);
 
@@ -176,7 +188,7 @@ class Server{
 		
 	}
 
-	// Adds one or more devices from an app connection
+	// Adds one or more devices to an app connection
 	onAppHookup( socket, ids, res ){
 		
 		if( !Array.isArray(ids) )
@@ -187,8 +199,11 @@ class Server{
 
 		for( let id of ids ){
 
-			if( typeof id !== 'string' )
+			try{
+				id = this.testDeviceID(id);
+			}catch(err){
 				continue;
+			}
 
 			// Add the device if not found
 			let pos = socket._devices.indexOf(id);
@@ -239,8 +254,11 @@ class Server{
 
 		for( let id of ids ){
 
-			if( typeof id !== "string" )
+			try{
+				id = this.testDeviceID(id);
+			}catch(err){
 				continue;
+			}
 
 			let pos = socket._devices.indexOf(id);
 			if( ~pos ){
@@ -316,13 +334,14 @@ class Server{
 
 	}
 
+	// handles a REST task
 	handleGet( id, data, type ){
 
 		if( typeof data !== "object" && !Array.isArray(data) ){
 
 			try{
 				data = JSON.parse(data);
-			}catch(e){
+			}catch( e ){
 				//this.debug(e);
 				return Promise.reject("Invalid JSON: "+e.message+" in "+data);
 			}
@@ -336,9 +355,10 @@ class Server{
 				"vib"
 			];
 
+			id = this.testDeviceID(id);
+
 			if( 
-				!id || !data || !type ||
-				typeof id !== 'string' ||
+				!data || !type ||
 				(typeof data !== 'object' && !Array.isArray(data)) ||
 				typeof type !== 'string'			
 			)rej('Invalid query string. Expecting id = (str)deviceID, data = (jsonObject)data, type = (str)messageType<br />Received id['+typeof id+'], data['+typeof data+'], type['+typeof type+']');
@@ -348,6 +368,7 @@ class Server{
 
 			else{
 
+				id = id.toUpperCase();
 				th.sendToRoom(Server.deviceSelfRoom(id), type, data);
 				res();
 	
@@ -389,9 +410,17 @@ class Server{
 		
 		// This app is not connected to the device
 		let id = data.shift();
-		if( !id || socket._devices.indexOf(id) === -1 )
-			return;
+		try{
+			id = this.testDeviceID(id);
+		}catch(err){
+			return this.debug(err);
+		}
 		
+		if( socket._devices.indexOf(id) === -1 )
+			return;
+
+		id = id.toUpperCase();
+
 		// Ok now we can send it
 		this.sendToRoom(Server.deviceSelfRoom(id), TASKS.TASK_CUSTOM_TO_DEVICE, [
 			data.shift(), 
@@ -408,6 +437,7 @@ class Server{
 		if( !Array.isArray(data) || !socket._device_id )
 			return;
 
+		// Device ID is case sensitive, device is not
 		let id = data.shift(),
 			output = data.shift()
 		;
