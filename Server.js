@@ -36,8 +36,12 @@ class Server{
 			console.log("Server online", this.port);
 		});
 
+
+		app.use('/api',cors());
+		app.use('/cdn',cors());
 		app.use(express.static(__dirname+'/public'));
-		app.use(cors());
+		
+		
 		
 		// Handle http requests
 		app.get('/api', (req, res) => { 
@@ -334,16 +338,8 @@ class Server{
 	// handles a REST task
 	handleGet( id, data, type ){
 
-		if( typeof data !== "object" && !Array.isArray(data) ){
-
-			try{
-				data = JSON.parse(data);
-			}catch( e ){
-				//this.debug(e);
-				return Promise.reject("Invalid JSON: "+e.message+" in "+data);
-			}
-
-		}
+		if( typeof data !== "object" && !Array.isArray(data) )
+			data = JSON.parse(data);
 
 		let allowed_types = [
 			"vib"
@@ -381,6 +377,8 @@ class Server{
 		}
 		catch(err){
 			out.message = err;
+			if( typeof err === "object" && err.message )
+				out.message = err.message;
 		}
 
 		res.status(out.status);
