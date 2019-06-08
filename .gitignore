@@ -57,5 +57,7 @@ typings/
 # dotenv environment variables file
 .env
 
-public/
+public/*
 .vscode/
+workspace.code-workspace
+public/index.html
