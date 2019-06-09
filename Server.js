@@ -5,7 +5,7 @@ const
 	io = require("socket.io")(http),
 	cors = require("cors"),
 	TASKS = require("./Tasks"),
-	fs = require('fs'),
+	fs = require('fs')
 ;
 
 class Server{
@@ -39,10 +39,11 @@ class Server{
 
 		app.use('/api',cors());
 		app.use('/cdn',cors());
-		app.use(express.static(__dirname+'/public'));
-		// Optionally if you want to handle POST requests, you can create a file named PostHandler.js exporting a function to be called
-		if(fs.existsSync(__dirname+'/PostHandler.js'))
-			app.post('/', require('./PostHandler'));
+		// If you want a custom front end when visited in a browser etc, you can create a /site/index.js file to drive that
+		if(fs.existsSync(__dirname+'/site/index.js')){
+			const site = require('./site/index.js');
+			site(app, io);
+		}
 		
 		
 		// Handle http requests
