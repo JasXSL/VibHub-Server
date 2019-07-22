@@ -331,7 +331,7 @@ class Server{
 	// Program request via socket, works the same as GET
 	onSocketProgram( socket, program ){
 
-		if( typeof program !== 'object' && !Array.isArray(program) )
+		if( !Array.isArray(program) )
 			return;
 
 		this.sendToRoom(Server.deviceSelfRoom(), type, data);
@@ -344,20 +344,14 @@ class Server{
 		if( typeof data !== "object" && !Array.isArray(data) )
 			data = JSON.parse(data);
 
-		let allowed_types = [
-			"vib"
-		];
-
 		id = this.formatDeviceID(id);
 
-		if( 
-			!data || !type ||
-			(typeof data !== 'object' && !Array.isArray(data)) ||
-			typeof type !== 'string'			
-		)throw 'Invalid query string. Expecting id = (str)deviceID, data = (jsonObject)data, type = (str)messageType<br />Received id['+typeof id+'], data['+typeof data+'], type['+typeof type+']';
-		
-		if( allowed_types.indexOf(type) === -1 )
-			throw 'Invalid type specified. Supported types are:<ul><li>'+allowed_types.join('</li><li>')+'</li></ul>';
+		if( type === 'vib' ){
+			if( !Array.isArray(data) )
+				throw "Data must be an array.";
+		}
+		else 
+			throw 'Unknown call type.';
 
 		id = id.toUpperCase();
 		this.sendToRoom(Server.deviceSelfRoom(id), type, data);
