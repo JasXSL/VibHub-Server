@@ -110,8 +110,6 @@ Create vibhub.conf
 
 Change example.com to your domain.
 ```
-ServerName example.com
-
 <VirtualHost *:80>
 	ServerAdmin webmaster@example.com
 	ServerName example.com
@@ -132,8 +130,8 @@ ServerName example.com
 	RewriteCond %{HTTP:Connection} Upgrade [NC]
 	RewriteRule /(.*) ws://localhost:8080/$1 [P,L]
 
-	ProxyPass /nodejs http://localhost:8080/
-	ProxyPassReverse /nodejs http://localhost:8080/
+	ProxyPass /api http://localhost:8080/api
+	ProxyPassReverse /api http://localhost:8080/api
 
 	ProxyPass /socket.io http://localhost:8080/socket.io
 	ProxyPassReverse /socket.io http://loacalhost:8080/socket.io
