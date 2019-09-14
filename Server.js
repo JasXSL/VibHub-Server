@@ -39,6 +39,7 @@ class Server{
 
 		app.use('/api',cors());
 		app.use('/cdn',cors());
+		app.use('/socket.io',cors());
 		// If you want a custom front end when visited in a browser etc, you can create a /site/index.js file to drive that
 		if(fs.existsSync(__dirname+'/site/index.js')){
 			const site = require('./site/index.js');
@@ -343,7 +344,7 @@ class Server{
 
 		if( typeof data !== "object" && !Array.isArray(data) )
 			data = JSON.parse(data);
-
+		
 		id = this.formatDeviceID(id);
 
 		if( type === 'vib' ){
