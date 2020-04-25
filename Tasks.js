@@ -8,7 +8,7 @@ module.exports = {
 
 	TASK_VIB : "vib",						// Automatically sent by the server to a device when a REST program is received.
 	
-	TASK_ADD_DEVICE : "id",					// (str)id | Adds a device to the server, allowing apps to send data to it. id is limited to 128 bytes
+	TASK_ADD_DEVICE : "id",					// (str)id | Adds a device to the server, allowing apps to send data to it.
 	
 	TASK_ADD_APP : "app",					// (str)name | Send from an app to add or update the app name. name is limited to 128 bytes 
 											// If a device disconnects, you'll have to send this again to send the app name to the device.

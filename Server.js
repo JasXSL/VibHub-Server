@@ -16,6 +16,9 @@ class Server{
 		this.config = {
 			port : 80,
 			debug : false,
+			device_id_min_size : 10,
+			device_id_max_size : 128,
+			device_id_case_sensitive : false,
 		};
 
 	}
@@ -27,6 +30,7 @@ class Server{
 		}catch(err){
 			console.error("Unable to load config, using default. Error: ", err);
 		}
+
 		// Begin
 		this.allowDebug = this.config.debug;
 		this.port = +this.config.port;
@@ -42,8 +46,10 @@ class Server{
 		app.use('/socket.io',cors());
 		// If you want a custom front end when visited in a browser etc, you can create a /site/index.js file to drive that
 		if(fs.existsSync(__dirname+'/site/index.js')){
+			
 			const site = require('./site/index.js');
 			site(app, io);
+
 		}
 		
 		
@@ -137,11 +143,13 @@ class Server{
 	formatDeviceID( id ){
 
 		if( typeof id !== "string" )
-			throw "Invalide device ID type";
+			throw "Invalid device ID type";
 
-		if( id.length < 10 || id.length > 64 )
-			throw "Invalid device ID size";
+		if( id.length < this.config.device_id_min_size || id.length > this.device_id_max_size )
+			throw "Invalid device ID size. Must be between "+this.device_id_min_size+" and "+this.device_id_max_size+" bytes.";
 
+		if( this.device_id_case_sensitive )
+			return id;
 		return id.toUpperCase();
 
 	}
@@ -342,19 +350,31 @@ class Server{
 	// handles a REST task
 	handleGet( id, data, type ){
 
-		if( typeof data !== "object" && !Array.isArray(data) )
+		if( typeof id !== "string" )
+			throw "Request device ID invalid. Use id=deviceID in GET request.";
+
+		if( !Array.isArray(data) && typeof data !== "string" )
+			throw "Request data invalid. Should be a JSON array. Use data=[...] in GET request.";
+
+		if( typeof type !== "string" )
+			throw "Request type invalid. Use type=requestType in GET request.";
+
+		if( !Array.isArray(data) )
 			data = JSON.parse(data);
 		
 		id = this.formatDeviceID(id);
 
 		if( type === 'vib' ){
+
 			if( !Array.isArray(data) )
 				throw "Data must be an array.";
+
 		}
 		else 
 			throw 'Unknown call type.';
 
-		id = id.toUpperCase();
+		if( !this.config.device_id_case_sensitive )
+			id = id.toUpperCase();
 		this.sendToRoom(Server.deviceSelfRoom(id), type, data);
 
 	}
@@ -367,20 +387,30 @@ class Server{
 			message : 'OK',
 		};
 
-		let data = req.query.data;
 
 		try{
-			this.handleGet(req.query.id, data, req.query.type);
+
+			this.handleGet(
+				req.query.id, 
+				req.query.data, 
+				req.query.type
+			);
 			out.status = 200;
+
 		}
 		catch(err){
+
 			out.message = err;
 			if( typeof err === "object" && err.message )
 				out.message = err.message;
+
 		}
 
 		res.status(out.status);
-		res.send(out.message);
+		res.json({
+			message : out.message,
+			success : out.status === 200
+		});
 
 	}
 
@@ -401,7 +431,8 @@ class Server{
 		if( socket._devices.indexOf(id) === -1 )
 			return;
 
-		id = id.toUpperCase();
+		if( !this.config.device_id_case_sensitive )
+			id = id.toUpperCase();
 
 		// Ok now we can send it
 		this.sendToRoom(Server.deviceSelfRoom(id), TASKS.TASK_CUSTOM_TO_DEVICE, [
