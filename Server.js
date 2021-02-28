@@ -1,4 +1,5 @@
 const { debug } = require("console");
+const Tasks = require("./Tasks");
 
 const
 	express = require("express"),
@@ -418,7 +419,7 @@ class Server{
 	}
 
 	// handles a REST task
-	handleGet( id, data, type ){
+	async handleGet( id, data, type ){
 
 		if( typeof id !== "string" )
 			throw "Request device ID invalid. Use id=deviceID in GET request.";
@@ -432,25 +433,41 @@ class Server{
 		if( !Array.isArray(data) )
 			data = JSON.parse(data);
 		
+		// ID always required
 		id = this.formatDeviceID(id);
+		if( !this.config.device_id_case_sensitive )
+			id = id.toUpperCase();
 
-		if( type === 'vib' ){
+		if( type === Tasks.TASK_VIB ){
 
 			if( !Array.isArray(data) )
 				throw "Data must be an array.";
 
+			this.sendToRoom(Server.deviceSelfRoom(id), type, data);
+
 		}
+		else if( type === Tasks.TASK_WHOIS ){
+
+			const sockets = await this.getSocketsInRoom(Server.deviceSelfRoom(id));
+			let data = new DeviceInfo();
+			if( sockets.length && sockets[0]._device_info )
+				data = sockets[0]._device_info;
+			
+			return data.export();
+
+		}
+		
+
 		else 
 			throw 'Unknown call type.';
 
-		if( !this.config.device_id_case_sensitive )
-			id = id.toUpperCase();
-		this.sendToRoom(Server.deviceSelfRoom(id), type, data);
+		
+		
 
 	}
 
 	// GET Request received from webserver
-	onGet( req, res ){
+	async onGet( req, res ){
 
 		let out = {
 			status : 400,
@@ -460,17 +477,19 @@ class Server{
 
 		try{
 
-			this.handleGet(
+			let message = await this.handleGet(
 				req.query.id, 
 				req.query.data, 
 				req.query.type
 			);
+			if( message )
+				out.message = message;
 			out.status = 200;
 
 		}
 		catch(err){
 
-			out.message = err;
+			out.message = {error : err};
 			if( typeof err === "object" && err.message )
 				out.message = err.message;
 

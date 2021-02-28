@@ -23,6 +23,9 @@ module.exports = {
 											// When forwarded it gets the argument: [(str)appName, (str)appConnectionID]
 											// Received by: Server from App
 
+	TASK_WHOIS : "whois",					// (str)id | Gets meta information about a device
+											// Received by: Server from App
+
 	TASK_APP_OFFLINE : "app_offline",		// (str)appName, (str)connectionID | Automatically sent to all devices the app was connected to whenever the app goes offline.
 											// Received by: Device from Server
 

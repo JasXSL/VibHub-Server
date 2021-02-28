@@ -6,7 +6,7 @@ class DeviceInfo{
 	constructor( data ){
 
 		if( typeof data != "object" )
-			return;
+			data = {};
 
 		this.numPorts = parseInt(data.numPorts) || 0;			// Nr ports supported by device
 		this.version = data.version ? String(data.version).substr(0, 64) : '???';		// Max 64 characters
