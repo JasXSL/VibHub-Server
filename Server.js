@@ -1,3 +1,5 @@
+const { debug } = require("console");
+
 const
 	express = require("express"),
 	app = express(),
@@ -5,7 +7,8 @@ const
 	io = require("socket.io")(http),
 	cors = require("cors"),
 	TASKS = require("./Tasks"),
-	fs = require('fs')
+	fs = require('fs'),
+	DeviceInfo = require("./DeviceInfo")
 ;
 
 class Server{
@@ -45,7 +48,7 @@ class Server{
 		app.use('/cdn',cors());
 		app.use('/socket.io',cors());
 		// If you want a custom front end when visited in a browser etc, you can create a /site/index.js file to drive that
-		if(fs.existsSync(__dirname+'/site/index.js')){
+		if( fs.existsSync(__dirname+'/site/index.js') ){
 			
 			const site = require('./site/index.js');
 			site(app, io);
@@ -61,10 +64,10 @@ class Server{
 		// Handle WS requests
 		io.on("connection", socket => {
 
-			this.debug("sIO New generic connection established");
+			this.debug("sIO New user connected");
 
 			socket.on("disconnect", () => { this.onDisconnect(socket); });
-			socket.on(TASKS.TASK_ADD_DEVICE, id => { this.onDeviceConnected(socket, id); });
+			socket.on(TASKS.TASK_ADD_DEVICE, (data, res) => { this.onDeviceConnected(socket, data, res); });
 			socket.on(TASKS.TASK_HOOKUP, (id, res) => { this.onAppHookup(socket, id, res); });
 			socket.on(TASKS.TASK_HOOKDOWN, (id, res) => { this.onAppHookdown(socket, id, res); });
 			socket.on(TASKS.TASK_PWM, hex => { this.onSocketPWM(socket, hex); });
@@ -73,19 +76,19 @@ class Server{
 			socket.on(TASKS.TASK_CUSTOM_TO_APP, data => { this.onCustomToApp(socket, data); });
 			socket.on(TASKS.TASK_GET, async data => { 
 					
-					this.debug("Program received", JSON.stringify(data), typeof data);
-					if( typeof data !== "object" )
-						return this.debug("Program is not acceptable, expected object, got ", typeof data);
+				this.debug("Program received", JSON.stringify(data), typeof data);
+				if( typeof data !== "object" )
+					return this.debug("Program is not acceptable, expected object, got ", typeof data);
 
-					try{
-						await this.handleGet(data.id, data.data, data.type);
-						this.debug("Program successfully accepted");
-					}catch( err ){
-						this.debug("Program error", err);
-					}
+				try{
+					await this.handleGet(data.id, data.data, data.type);
+					this.debug("Program successfully accepted");
+				}catch( err ){
+					this.debug("Program error", err);
+				}
 
-				});
-				socket.on(TASKS.TASK_PWM_SPECIFIC, hex => { this.onSocketPWM(socket, hex, TASKS.TASK_PWM_SPECIFIC); });
+			});
+			socket.on(TASKS.TASK_PWM_SPECIFIC, hex => { this.onSocketPWM(socket, hex, TASKS.TASK_PWM_SPECIFIC); });
 
 		});
 
@@ -174,20 +177,48 @@ class Server{
 	}
 
 	// Enables a device for listening
-	async onDeviceConnected( socket, id ){
+	// Data can be a string id for "anonymous" devices, or an object with metadata
+	async onDeviceConnected( socket, data, res ){
+
+		let id = data;
+		if( typeof data === "object" )
+			id = data.id;
+		else
+			data = {};
 
 		try{
+
 			id = this.formatDeviceID(id);
+
 		}catch(err){
+
+			res({error : "Invalid ID"});
 			return this.debug(err);
+
 		}
 
 		socket.leaveAll();
+
+		// Yeet any existing devices in this room, there can be only one!
+		try{
+			
+			const sockets = await this.getSocketsInRoom(Server.deviceSelfRoom(id));
+			if( sockets )
+				sockets.map(socket => socket.disconnect());
+
+		}catch(err){
+			this.debug(err);
+			return;
+		}
+		
+
 		socket.join(Server.deviceSelfRoom(id));
 		socket._device_id = id;
+		socket._device_info = new DeviceInfo(data);
 
 		// Tell any apps subscribed to this id that a device has come online
-		this.sendToAppsByDeviceSocket(socket, TASKS.TASK_DEVICE_ONLINE, [id, socket.id]);
+		this.sendToAppsByDeviceSocket(socket, TASKS.TASK_DEVICE_ONLINE, [id, socket.id, socket._device_info.export()]);
+
 		this.debug("device", id, "is now listening");
 
 		try{
@@ -200,6 +231,34 @@ class Server{
 		}
 		
 	}
+
+	// Returns all sockets in a room. Returns a PROMISE, or false if the room is invalid
+	getSocketsInRoom( room ){
+
+		if( typeof room !== "string" )
+			return false;
+
+		return new Promise((res, rej) => {
+			
+			io.in(room).clients((err, ids) => {
+
+				if( err ){
+					rej(err);
+					return;
+				}
+	
+				const out = [];
+				ids.forEach(id => {
+					out.push(io.sockets.sockets[id]);
+				});
+				res(out);
+	
+			});
+
+		});
+
+	}
+
 
 	// Adds one or more devices to an app connection
 	onAppHookup( socket, ids, res ){
@@ -233,14 +292,25 @@ class Server{
 				socket.join(Server.deviceAppRoom(id));
 
 				// Get any devices actively connected with this id and raise connection events to the app
-				io.in(Server.deviceSelfRoom(id)).clients((err, clients) => {
-					if( err )
-						return;
-					for( let s of clients )
-						this.sendToSocket(socket, TASKS.TASK_DEVICE_ONLINE, [
-							id, s
-						]);
-				});
+				// There should only be one, but might as well
+				this.getSocketsInRoom(Server.deviceSelfRoom(id))
+					.then(sockets => {
+
+						for( let s of sockets ){
+
+							let dinfo = new DeviceInfo();
+							if( s._device_info )
+								dinfo = s._device_info;
+
+							this.sendToSocket(socket, TASKS.TASK_DEVICE_ONLINE, [
+								id, s.id, dinfo.export()
+							]);
+
+						}
+
+					})
+					.catch(err => this.debug(err));
+
 				
 
 			}
