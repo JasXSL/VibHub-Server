@@ -22,7 +22,6 @@ class Server{
 			debug : false,
 			device_id_min_size : 10,
 			device_id_max_size : 128,
-			device_id_case_sensitive : false,
 		};
 
 	}
@@ -152,9 +151,7 @@ class Server{
 		if( id.length < this.config.device_id_min_size || id.length > this.device_id_max_size )
 			throw "Invalid device ID size. Must be between "+this.device_id_min_size+" and "+this.device_id_max_size+" bytes.";
 
-		if( this.device_id_case_sensitive )
-			return id;
-		return id.toUpperCase();
+		return id;
 
 	}
 
@@ -212,8 +209,8 @@ class Server{
 			return;
 		}
 		
-
-		socket.join(Server.deviceSelfRoom(id));
+		const selfRoom = Server.deviceSelfRoom(id);
+		socket.join(selfRoom);
 		socket._device_id = id;
 		socket._device_info = new DeviceInfo(data);
 
@@ -290,7 +287,8 @@ class Server{
 				]);
 
 				// Join the app room for the device
-				socket.join(Server.deviceAppRoom(id));
+				const appRoom = Server.deviceAppRoom(id);
+				socket.join(appRoom);
 
 				// Get any devices actively connected with this id and raise connection events to the app
 				// There should only be one, but might as well
@@ -435,8 +433,6 @@ class Server{
 		
 		// ID always required
 		id = this.formatDeviceID(id);
-		if( !this.config.device_id_case_sensitive )
-			id = id.toUpperCase();
 
 		if( type === Tasks.TASK_VIB ){
 
@@ -519,9 +515,6 @@ class Server{
 
 		if( socket._devices.indexOf(id) === -1 )
 			return;
-
-		if( !this.config.device_id_case_sensitive )
-			id = id.toUpperCase();
 
 		// Ok now we can send it
 		this.sendToRoom(Server.deviceSelfRoom(id), TASKS.TASK_CUSTOM_TO_DEVICE, [
