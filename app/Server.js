@@ -5,7 +5,9 @@ const
 	express = require("express"),
 	app = express(),
 	http = require("http").Server(app),
-	io = require("socket.io")(http),
+	io = require("socket.io")(http, {
+		allowEIO3: true,
+	}),
 	cors = require("cors"),
 	TASKS = require("./Tasks"),
 	fs = require('fs'),
@@ -40,7 +42,7 @@ class Server{
 			
 		// Start HTTP listening
 		http.listen(this.port, () => {
-			console.log("Server online", this.port);
+			console.log(">> Server online on port", this.port);
 		});
 
 

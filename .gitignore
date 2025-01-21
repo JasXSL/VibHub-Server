@@ -57,10 +57,12 @@ typings/
 # dotenv environment variables file
 .env
 
-site/
-site/*
+app/site/
+app/site/*
 .vscode/
 workspace.code-workspace
-public/index.html
-PostHandler.js
+app/public/index.html
+app/PostHandler.js
 VibHub.code-workspace
+install.sh
+docker-compose.yml

@@ -43,7 +43,7 @@ module.exports = {
 											// Received by: App from Server
 
 	TASK_CUSTOM_TO_DEVICE : "dCustom",		// (str)deviceID, (var)custom_data | Forwards custom data to an app connected to the device it's sent from by name
-											// Received by the device on success: (str)serverName, (str)socketID, (var)custom_data
+											// Received by the device on success: (str)appName, (str)socketID, (var)custom_data
 											// Received by: Server from App, Device from Server
 
 	TASK_CUSTOM_TO_APP : "aCustom",			// (str)socketID, (var)custom_data | Forwards custom data to a device connected to the app by app socketID. For this to work, the app must be named via TASK_ADD_APP
