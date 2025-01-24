@@ -7,6 +7,10 @@ const
 	http = require("http").Server(app),
 	io = require("socket.io")(http, {
 		allowEIO3: true,
+		cors: {
+			origin: "*",
+			methods: ["GET", "POST"]
+		}
 	}),
 	cors = require("cors"),
 	TASKS = require("./Tasks"),
