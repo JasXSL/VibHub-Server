@@ -1,4 +1,3 @@
-const { debug } = require("console");
 const Tasks = require("./Tasks");
 
 const
@@ -80,6 +79,8 @@ class Server{
 			socket.on(TASKS.TASK_ADD_APP, (name, res) => { this.onAppName(socket, name, res); });
 			socket.on(TASKS.TASK_CUSTOM_TO_DEVICE, data => { this.onCustomToDevice(socket, data); });
 			socket.on(TASKS.TASK_CUSTOM_TO_APP, data => { this.onCustomToApp(socket, data); });
+			socket.on(TASKS.TASK_BATTERY_REQ, (data, res) => { this.onBatteryRequest(socket, data, res); });
+			socket.on(TASKS.TASK_BATTERY_STATUS, data => { this.onBatteryStatus(socket, data); });
 			socket.on(TASKS.TASK_GET, async data => { 
 					
 				this.debug("Program received", JSON.stringify(data), typeof data);
@@ -196,7 +197,8 @@ class Server{
 
 		}catch(err){
 
-			res({error : "Invalid ID"});
+			if( res )
+				res({error : "Invalid ID"});
 			return this.debug(err);
 
 		}
@@ -237,39 +239,27 @@ class Server{
 	}
 
 	// Returns all sockets in a room. Returns a PROMISE, or false if the room is invalid
-	getSocketsInRoom( room ){
+	async getSocketsInRoom( room ){
 
 		if( typeof room !== "string" )
 			return false;
 
-		return new Promise((res, rej) => {
-			
-			io.in(room).clients((err, ids) => {
-
-				if( err ){
-					rej(err);
-					return;
-				}
-	
-				const out = [];
-				ids.forEach(id => {
-					out.push(io.sockets.sockets[id]);
-				});
-				res(out);
-	
-			});
-
-		});
+		const clients = await io.in(room).fetchSockets();
+		return clients;
 
 	}
 
 
 	// Adds one or more devices to an app connection
 	onAppHookup( socket, ids, res ){
+
+		if( !res )
+			return;
 		
 		if( !Array.isArray(ids) )
 			ids = [ids];
 
+		// Stores string IDs of devices we're managing
 		if( !Array.isArray(socket._devices) )
 			socket._devices = [];
 
@@ -322,12 +312,15 @@ class Server{
 
 		}
 
-		res(socket._devices);
+		if( res )
+			res(socket._devices);
 
 	}
 
 	// Removes a device from an app connection
 	onAppHookdown( socket, ids, res ){
+
+		
 
 		if( !Array.isArray(socket._devices) )
 			socket._devices = [];
@@ -362,7 +355,8 @@ class Server{
 
 		}
 
-		res(socket._devices);
+		if( res )
+			res(socket._devices);
 
 	}
 
@@ -379,7 +373,8 @@ class Server{
 			socket.id
 		]);
 
-		res(true);
+		if( res )
+			res(true);
 
 	}
 
@@ -399,7 +394,7 @@ class Server{
 			!Array.isArray(socket._devices)			// The socket is not an app
 		)return;
 			
-		let index = parseInt(hex.substr(0, 2), 16);
+		let index = parseInt(hex.substring(0, 2), 16);
 		let device = socket._devices[index];
 		if( !device )
 			return;
@@ -407,18 +402,59 @@ class Server{
 		this.sendToRoom(
 			Server.deviceSelfRoom(device), 
 			task,
-			hex.substr(2).toLowerCase()
+			hex.substring(2).toLowerCase()
 		);
 
 	}
 
-	// Program request via socket, works the same as GET
-	onSocketProgram( socket, program ){
 
-		if( !Array.isArray(program) )
+	// Forwards App to device, requests a battery read
+	onBatteryRequest( socket, data, res ){
+
+		if( !data || typeof data !== "object" || !data.id )
 			return;
 
-		this.sendToRoom(Server.deviceSelfRoom(), type, data);
+		let id = String(data.id);
+		// This app is not connected to the device
+		try{
+			id = this.formatDeviceID(id);
+		}catch(err){
+			return this.debug(err);
+		}
+
+		if( !socket._devices ){
+			if( res ) 
+				res({error : "No devices found"});
+			return;
+		}
+		if( socket._devices.indexOf(id) === -1 ){
+			if( res )
+				res({error : "You must hook up the device first"});
+			return;
+		}
+
+		this.sendToRoom(Server.deviceSelfRoom(id), TASKS.TASK_BATTERY_REQ, {id:socket.id});
+
+	}
+
+	onBatteryStatus( socket, data ){
+		if( typeof data !== "object" || !data )
+			return;
+
+		const out = {
+			low : Boolean(data.low),
+			mv : Math.trunc(data.mv) || 0,
+			id : String(data.id)
+		};
+
+		let app = io.sockets.sockets.get(data.app);
+		if( app ){ // Socket may be empty to send to every app that has this device
+			this.sendToSocket(app, TASKS.TASK_BATTERY_STATUS, out);
+		}
+		else{
+			this.sendToAppsByDeviceSocket(socket, TASKS.TASK_BATTERY_STATUS, out);
+		}
+		
 
 	}
 
@@ -545,7 +581,7 @@ class Server{
 		if( typeof id !== "string" )
 			return;
 
-		let app = io.sockets.sockets[id];
+		let app = io.sockets.sockets.get(id);
 		if( !app )
 			return;
 
@@ -633,7 +669,7 @@ class Server{
 	}
 
 	// Returns a promise resolving to sockets currently controlling a device id
-	static getAppsControllingDevice( socket ){
+	static async getAppsControllingDevice( socket ){
 
 		let devid = socket._device_id;
 
@@ -642,27 +678,17 @@ class Server{
 
 		let out = [];
 		let ns = io.of("/");
-		// make sure this socket is actually connected to that app
-		return new Promise((res, rej) => {
+		const clients = await ns.in(Server.deviceAppRoom(devid)).fetchSockets();
+		
+		for( let s of clients ){
+			
+			let socket = ns.connected[s];
+			if( socket )
+				out.push(socket);
 
-			io.in(Server.deviceAppRoom(devid)).clients((err, clients) => {
+		}
 
-				if( err )
-					return rej(err);
-
-				for( let s of clients ){
-					
-					let socket = ns.connected[s];
-					if( socket )
-						out.push(socket);
-
-				}
-
-				res(out);
-
-			});
-
-		});
+		return out;
 
 	}
 
