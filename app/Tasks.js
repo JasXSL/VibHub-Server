@@ -2,11 +2,12 @@
 
 module.exports = {
 
-	TASK_PWM : "p",							// (string)hex_pwm_bytes | Forward a hexadecimal PWM value update to one or more devices
-											// When sent to the server, the first byte is the device to send to
+	TASK_PWM : "p",							// (string)hex_pwm_bytes | Forward a hexadecimal PWM value update to one or more devices. The PWM bytes can begin with an extra byte of the bitwise value 0x1 to mark the values as high res (16 bit)
+											// When sent to the server, the first byte is the device to send to. This byte is removed when forwarded to the device.
 											// Received by: Server from App / Device from Server
 
 	TASK_PWM_SPECIFIC : "ps",				// (string)hex_pwm_bytes | Similar to above, but ports are specified, hex bytes are in the order of: deviceIndex, port_id,pwm, port_id2,pwm2...
+											// The leftmost bit (0x80) in deviceIndex is reserved as a "high res" flag. When set, you use 2 bytes for PWM where the leftmost is MSB. Ex: 00(devIdx) 80(port0,hiRes) 0FFF(max intensity for a 12bit device)  
 											// Received by: Server from App / Device from Server
 
 	TASK_VIB : "vib",						// Automatically sent by the server to a device when a REST program is received.
@@ -56,8 +57,10 @@ module.exports = {
 	TASK_BATTERY_REQ : "gb",				// {id:(str)deviceID/appID} | Requests battery status from a device. Note that devices have to have the TASK_BATTERY_STATUS capability in order to reply.
 											// Received by: Server from App, Device from Server. DeviceID is replaced with appID on the server to designate the app to reply to.
 	
-	TASK_BATTERY_STATUS : "sb",				// {low:(bool)battery_is_low, mv:(int)millivolts, app:(str)appID*, id:(str)deviceID*} | Requests/replies with battery status. If id is not supplied, it will reply to ALL apps.
+	TASK_BATTERY_STATUS : "sb",				// {low:(bool)battery_is_low, mv:(int)millivolts, mx:(int)millivolts_max, app:(str)appID*, id:(str)deviceID*} | Requests/replies with battery status. If id is not supplied, it will reply to ALL apps.
 											// Received by: App from Server (deviceID is supplied), Server from Device (if appID is specified, it replies to a specific app, provided the app has this device, otherwise it resplies to ALL apps that have this device).
+	TASK_HIGHRES : "h",						// void | Not an endpoint, used to mark that we're able to use high resolution in vib/ps/p.
+											// Received by: Server from Device. Capability data will be nr of bits supported.
 
 };
 

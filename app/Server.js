@@ -23,7 +23,7 @@ class Server{
 
 		// Server base configuration
 		this.config = {
-			port : 80,
+			port : process.env.PORT || 80,
 			debug : false,
 			device_id_min_size : 10,
 			device_id_max_size : 128,
@@ -365,7 +365,7 @@ class Server{
 		if( typeof name !== "string" )
 			return;
 
-		name = name.substr(0, 128);
+		name = name.substring(0, 128);
 		socket._app_name = name;
 		// Tell any connected devices that we changed name
 		this.sendToDevicesByAppSocket(socket, TASKS.TASK_ADD_APP, [
@@ -388,7 +388,7 @@ class Server{
 
 		if( 
 			typeof hex !== "string" || 				// Hex is not a string
-			hex.length < 4 || 						// Hex needs to contain at least 2 bytes
+			hex.length < 4 || 						// Needs at least a device index and a value for one port
 			hex.length%2 ||							// Hex is not a multiple of 2
 			!hex.match(/-?[0-9a-fA-F]+/) ||		// Hex is not hexadecimal
 			!Array.isArray(socket._devices)			// The socket is not an app
@@ -444,7 +444,8 @@ class Server{
 		const out = {
 			low : Boolean(data.low),
 			mv : Math.trunc(data.mv) || 0,
-			id : String(data.id)
+			id : String(data.id),
+			xv : Math.trunc(data.xv) || 0
 		};
 
 		let app = io.sockets.sockets.get(data.app);

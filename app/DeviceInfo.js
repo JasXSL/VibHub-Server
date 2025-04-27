@@ -9,9 +9,9 @@ class DeviceInfo{
 			data = {};
 
 		this.numPorts = parseInt(data.numPorts) || 0;			// Nr ports supported by device
-		this.version = data.version ? String(data.version).substr(0, 64) : '???';		// Max 64 characters
-		this.hwversion = data.hwversion ? String(data.hwversion).substr(0, 64) : '???';		// Max 64 characters
-		this.custom = data.custom ? String(data.custom).substr(0, 256) : '';			// Custom data, max 256 characters
+		this.version = data.version ? String(data.version).substring(0, 64) : '???';		// Max 64 characters
+		this.hwversion = data.hwversion ? String(data.hwversion).substring(0, 64) : '???';		// Max 64 characters
+		this.custom = data.custom ? String(data.custom).substring(0, 256) : '';			// Custom data, max 256 characters
 		
 		this.capabilities = {};									// taskName : true / false / "custom"
 		if( typeof data.capabilities === "object" ){
@@ -21,9 +21,9 @@ class DeviceInfo{
 				i = String(i).toLowerCase();
 				if( tVals.includes(i) ){
 
-					let val = String(data.capabilities[i]).toLowerCase();
-					if( val !== "custom" )
-						val = Boolean(val);
+					let val = Boolean(data.capabilities[i]);
+					if( typeof data.capabilities[i] === "string" ) 
+						val = String(data.capabilities[i]).toLowerCase().substring(0,32); // Capabilities can be max 32 bytes 
 
 					this.capabilities[i] = val;
 
