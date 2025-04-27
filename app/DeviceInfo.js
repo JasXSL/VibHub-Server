@@ -13,6 +13,11 @@ class DeviceInfo{
 		this.hwversion = data.hwversion ? String(data.hwversion).substring(0, 64) : '???';		// Max 64 characters
 		this.custom = data.custom ? String(data.custom).substring(0, 256) : '';			// Custom data, max 256 characters
 		
+		this.batLastRead = 0;		// Last battery read
+		this.batLow = false;		// Battery low status
+		this.batMv = 0;				// Current millivolts
+		this.batXv = 0;				// Max millivolts
+
 		this.capabilities = {};									// taskName : true / false / "custom"
 		if( typeof data.capabilities === "object" ){
 
@@ -33,6 +38,30 @@ class DeviceInfo{
 
 		}
 
+	}
+
+	// Returns true if we should update the clients
+	addBatteryReading( lowStatus, mv, xv ){
+		
+		this.batLow = Boolean(lowStatus);
+		this.batMv = parseInt(mv) || 0;
+		this.batXv = parseInt(xv) || 0;
+
+		if( Date.now() - this.batLastRead > 10e3 ){
+			this.batLastRead = Date.now();
+			return true;
+		}
+		return false;
+
+	}
+
+	exportBattery(){
+		return {
+			last : Math.floor(this.batLastRead/1000),
+			low : this.batLow,
+			mv : this.batMv,
+			xv : this.batXv
+		};
 	}
 
 	export(){

@@ -437,23 +437,24 @@ class Server{
 
 	}
 
-	onBatteryStatus( socket, data ){
+	async onBatteryStatus( socket, data ){
 		if( typeof data !== "object" || !data )
 			return;
 
-		const out = {
-			low : Boolean(data.low),
-			mv : Math.trunc(data.mv) || 0,
-			id : String(data.id),
-			xv : Math.trunc(data.xv) || 0
-		};
-
+		const dInfo = socket._device_info;
+		if( !dInfo )
+			return;
+		
+		const updateAll = dInfo.addBatteryReading(data.low, data.mv, data.xv);
+		let out = dInfo.exportBattery();
+		out.id = String(data.id);
+		
 		let app = io.sockets.sockets.get(data.app);
-		if( app ){ // Socket may be empty to send to every app that has this device
-			this.sendToSocket(app, TASKS.TASK_BATTERY_STATUS, out);
-		}
-		else{
+		if( updateAll ){ // Need to update all sockets
 			this.sendToAppsByDeviceSocket(socket, TASKS.TASK_BATTERY_STATUS, out);
+		}
+		else if( app ){ // Socket may be empty to send to every app that has this device
+			this.sendToSocket(app, TASKS.TASK_BATTERY_STATUS, out);
 		}
 		
 
@@ -493,6 +494,15 @@ class Server{
 				data = sockets[0]._device_info;
 			
 			return data.export();
+
+		}
+		else if( type === Tasks.TASK_BATTERY_REQ ){
+
+			const sockets = await this.getSocketsInRoom(Server.deviceSelfRoom(id));
+			let data = new DeviceInfo();
+			if( sockets.length && sockets[0]._device_info )
+				data = sockets[0]._device_info;
+			return data.exportBattery();
 
 		}
 		
