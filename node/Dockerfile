@@ -1,3 +1,3 @@
-FROM node:22.13.0
+FROM node
 WORKDIR /node/app
 CMD test -d "node_modules" && npm run start || npm install && npm run start

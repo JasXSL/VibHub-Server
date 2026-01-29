@@ -60,9 +60,7 @@ typings/
 app/site/
 app/site/*
 .vscode/
-workspace.code-workspace
 app/public/index.html
 app/PostHandler.js
 VibHub.code-workspace
 install.sh
-docker-compose.yml

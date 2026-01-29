@@ -1,0 +1,18 @@
+services:
+  node:
+    build:
+      context: .
+      dockerfile: node/Dockerfile
+    environment:
+      NODE_ENV: production
+    networks:
+      - internal
+    volumes:
+      - ./app:/node/app
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+networks:
+  internal:
+    driver: bridge
+
