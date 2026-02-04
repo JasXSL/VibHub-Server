@@ -22,7 +22,7 @@ module.exports = {
 											// If a device disconnects, you'll have to send this again to send the app name to the device.
 											// This call is also automatically sent to any devices currently connected to the app, and also from TASK_HOOKUP / TASK_HOOKDOWN
 											// When forwarded it gets the argument: [(str)appName, (str)appConnectionID]
-											// Received by: Server from App
+											// Received by: Server from App, Device from Server
 
 	TASK_WHOIS : "whois",					// (str)id | Gets meta information about a device
 											// Received by: Server from App
