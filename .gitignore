@@ -64,3 +64,4 @@ app/public/index.html
 app/PostHandler.js
 VibHub.code-workspace
 install.sh
+app/package.lock
