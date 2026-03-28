@@ -17,6 +17,7 @@ class DeviceInfo{
 		this.batLow = false;		// Battery low status
 		this.batMv = 0;				// Current millivolts
 		this.batXv = 0;				// Max millivolts
+		this.tempC = 0;				// Current temperature
 
 		this.capabilities = {};									// taskName : true / false / "custom"
 		if( typeof data.capabilities === "object" ){
@@ -41,11 +42,12 @@ class DeviceInfo{
 	}
 
 	// Returns true if we should update the clients
-	addBatteryReading( lowStatus, mv, xv ){
+	addReading( lowStatus = false, mv = 0, xv = 0, tempC = 0 ){
 		
 		this.batLow = Boolean(lowStatus);
 		this.batMv = parseInt(mv) || 0;
 		this.batXv = parseInt(xv) || 0;
+		this.tempC = +tempC || 0;
 
 		if( Date.now() - this.batLastRead > 10e3 ){
 			this.batLastRead = Date.now();
@@ -55,12 +57,14 @@ class DeviceInfo{
 
 	}
 
-	exportBattery(){
+
+	exportBoardStatus(){
 		return {
 			last : Math.floor(this.batLastRead/1000),
 			low : this.batLow,
 			mv : this.batMv,
-			xv : this.batXv
+			xv : this.batXv,
+			t : this.tempC
 		};
 	}
 

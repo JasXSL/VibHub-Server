@@ -54,10 +54,20 @@ module.exports = {
 	TASK_GET : "GET",						// {id:(str)deviceID, type:(str)type, data:(obj)data} | Emulates a REST request with websocket. Uses the same structure.
 											// Received by: Server from App
 
-	TASK_BATTERY_REQ : "gb",				// {id:(str)deviceID/appID} | Requests battery status from a device. Note that devices have to have the TASK_BATTERY_STATUS capability in order to reply.
+	TASK_BOARD_REQ : "gb",					// {id:(str)deviceID/appID} | Requests battery status from a device. Note that devices have to have the TASK_BATTERY_STATUS capability in order to reply.
 											// Received by: Server from App, Device from Server. DeviceID is replaced with appID on the server to designate the app to reply to.
 	
-	TASK_BATTERY_STATUS : "sb",				// {low:(bool)battery_is_low, mv:(int)millivolts, mx:(int)millivolts_max, app:(str)appID*, id:(str)deviceID*} | Requests/replies with battery status. If id is not supplied, it will reply to ALL apps.
+	TASK_BOARD_STATUS : "sb",				/* Returns an object with the following keys (based on capability):
+												ALWAYS (If gb capability is supported):
+													- app:(str)appID*, 
+													- id:(str)deviceID* | If id is not supplied, it will reply to ALL apps.
+												Battery Capability:											
+													- low:(bool)battery_is_low
+													- mv:(int)millivolts
+													- mx:(int)millivolts_max
+												Temperature Capability:
+													- t : (float)temperature_celsius
+											*/
 											// Received by: App from Server (deviceID is supplied), Server from Device (if appID is specified, it replies to a specific app, provided the app has this device, otherwise it resplies to ALL apps that have this device).
 	TASK_HIGHRES : "h",						// void | Not an endpoint, used to mark that we're able to use high resolution in vib/ps/p.
 											// Received by: Server from Device. Capability data will be nr of bits supported.
