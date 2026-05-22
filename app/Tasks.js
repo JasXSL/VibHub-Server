@@ -72,5 +72,9 @@ module.exports = {
 	TASK_HIGHRES : "h",						// void | Not an endpoint, used to mark that we're able to use high resolution in vib/ps/p.
 											// Received by: Server from Device. Capability data will be nr of bits supported.
 
+	// These are just here for capability tracking, they don't have their own endpoints.
+	TASK_BATTERY_LEVEL : "bat",
+	TASK_TEMPERATURE : "temp",
+
 };
 
