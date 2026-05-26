@@ -10,8 +10,8 @@
   "author": "JasX",
   "license": "GPL-3.0",
   "dependencies": {
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "express": "^5.2.1",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.3"
   }
 }
