@@ -67,6 +67,7 @@ module.exports = {
 													- mx:(int)millivolts_max
 												Temperature Capability:
 													- t : (float)temperature_celsius
+													- ct : (float)core_temperature_celsius
 											*/
 											// Received by: App from Server (deviceID is supplied), Server from Device (if appID is specified, it replies to a specific app, provided the app has this device, otherwise it resplies to ALL apps that have this device).
 	TASK_HIGHRES : "h",						// void | Not an endpoint, used to mark that we're able to use high resolution in vib/ps/p.

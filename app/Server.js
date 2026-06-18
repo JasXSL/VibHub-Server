@@ -445,7 +445,7 @@ class Server{
 		if( !dInfo )
 			return;
 
-		const updateAll = dInfo.addReading(data.low, data.mv, data.xv, data.t);
+		const updateAll = dInfo.addReading(data.low, data.mv, data.xv, data.t, data.ct);
 		let out = dInfo.exportBoardStatus();
 		out.id = String(data.id);
 		
